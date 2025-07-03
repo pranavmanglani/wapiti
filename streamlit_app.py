@@ -1,48 +1,36 @@
+
 import streamlit as st
-import subprocess
-import os
+import requests
 import tempfile
-import shutil
+import os
 
-st.set_page_config(page_title="Wapiti Web Scanner", layout="centered")
+st.set_page_config(page_title="Wapiti Web Vulnerability Scanner", layout="wide")
 
-st.title("🔍 Wapiti Web Vulnerability Scanner")
+st.title("🛡️ Wapiti Web Vulnerability Scanner (Streamlit Community Edition)")
 
-target = st.text_input("Enter target URL (e.g. https://testphp.vulnweb.com):")
+target_url = st.text_input("🔗 Enter Target URL", placeholder="https://example.com")
 
-if st.button("Start Scan"):
-    if not target.strip():
-        st.warning("Please enter a valid target URL.")
-    else:
-        with st.spinner("Scanning... please wait."):
-            # Create a temporary directory for the report
-            temp_dir = tempfile.mkdtemp()
+run_scan = st.button("🚀 Run Scan")
+
+if run_scan and target_url:
+    with st.spinner("Running scan... Please wait."):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = os.path.join(tmpdir, "report.html")
             try:
-                command = [
-                    "python", "-m", "wapiti",
-                    "-u", target,
-                    "-f", "html",
-                    "-o", temp_dir,
-                    "-v", "2"
-                ]
-                result = subprocess.run(command, capture_output=True, text=True)
-
-                st.success("✅ Scan complete!")
-
-                st.subheader("📜 Raw Wapiti Output")
-                st.code(result.stdout if result.stdout else "[No output]")
-
-                report_path = os.path.join(temp_dir, "index.html")
-                if os.path.exists(report_path):
-                    with open(report_path, "r", encoding="utf-8") as f:
-                        report_data = f.read()
-                    st.subheader("🧾 HTML Report Preview")
-                    st.components.v1.html(report_data, height=500, scrolling=True)
-                    st.download_button("⬇️ Download Report", data=report_data, file_name="wapiti_report.html", mime="text/html")
-                else:
-                    st.warning("No HTML report generated.")
-
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
-            finally:
-                shutil.rmtree(temp_dir)
+                import wapitiCore.wapiti as wapiti
+            except ImportError:
+                st.error("Wapiti module not available. Streamlit Cloud does not support it directly.")
+                st.info("Please run this app locally with `pip install wapiti3`.")
+            else:
+                try:
+                    scanner = wapiti.Wapiti()
+                    scanner.scan(target_url, scope="folder")
+                    scanner.report(report_type="html", output_file=output_path)
+                    st.success("Scan completed!")
+                    with open(output_path, "r", encoding="utf-8", errors="ignore") as f:
+                        html_report = f.read()
+                    st.components.v1.html(html_report, height=600, scrolling=True)
+                except Exception as e:
+                    st.error(f"Scan failed: {e}")
+else:
+    st.info("Enter a valid target URL and click 'Run Scan'.")
